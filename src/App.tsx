@@ -16,9 +16,12 @@ import { LeadershipInsights } from './components/LeadershipInsights';
 import { LeadTable } from './components/LeadTable';
 import { MethodologySection } from './components/MethodologySection';
 import { CsvImportModal } from './components/CsvImportModal';
-import { AlertCircle, Upload } from 'lucide-react';
+import { AlertCircle, Upload, LayoutDashboard, Award } from 'lucide-react';
+
+export type DashboardTab = 'overview' | 'scoring-insights';
 
 export function App() {
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [leads, setLeads] = useState<ProcessedLead[]>([]);
   const [mappingInfo, setMappingInfo] = useState<ColumnMappingInfo>({
     hasCourseColumn: false,
@@ -187,49 +190,83 @@ export function App() {
           </div>
         ) : (
           <>
-            {/* 1. Filter Toolbar */}
-            <FilterToolbar
-              leads={leads}
-              filters={filters}
-              hasCourseColumn={mappingInfo.hasCourseColumn}
-              filteredCount={filteredLeads.length}
-              onChangeFilter={handleFilterChange}
-              onResetFilters={handleResetFilters}
-            />
+            {/* Navigation Tabs */}
+            <div className="bg-white rounded-xl border border-slate-200 p-1.5 shadow-sm flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('overview')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'overview'
+                    ? 'bg-navy-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-navy-900 hover:bg-slate-100'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('scoring-insights')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'scoring-insights'
+                    ? 'bg-navy-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-navy-900 hover:bg-slate-100'
+                }`}
+              >
+                <Award className="w-4 h-4" />
+                Glossary &amp; Insights
+              </button>
+            </div>
 
-            {/* 2. Four Primary KPIs */}
-            <KpiCards metrics={kpiMetrics} totalDatasetCount={leads.length} />
+            {activeTab === 'overview' ? (
+              <>
+                {/* 1. Filter Toolbar */}
+                <FilterToolbar
+                  leads={leads}
+                  filters={filters}
+                  hasCourseColumn={mappingInfo.hasCourseColumn}
+                  filteredCount={filteredLeads.length}
+                  onChangeFilter={handleFilterChange}
+                  onResetFilters={handleResetFilters}
+                />
 
-            {/* 3. Visualizations */}
-            <ChartsSection
-              leads={filteredLeads}
-              showPriorityBands={showPriorityBands}
-            />
+                {/* 2. Four Primary KPIs */}
+                <KpiCards metrics={kpiMetrics} totalDatasetCount={leads.length} />
 
-            {/* 4. Lead Scoring Analysis & Provisional Priority Bands */}
-            <ScoringAnalysis
-              leads={filteredLeads}
-              showPriorityBands={showPriorityBands}
-              onTogglePriorityBands={() => setShowPriorityBands((p) => !p)}
-              onQuickFilterScore={handleQuickFilterScore}
-            />
+                {/* 3. Visualizations */}
+                <ChartsSection
+                  leads={filteredLeads}
+                  showPriorityBands={showPriorityBands}
+                />
 
-            {/* 5. Leadership Insights */}
-            <LeadershipInsights
-              insights={insights}
-              totalLeads={filteredLeads.length}
-            />
+                {/* 4. Detailed Lead Table */}
+                <LeadTable
+                  leads={filteredLeads}
+                  hasCourseColumn={mappingInfo.hasCourseColumn}
+                  showPriorityBands={showPriorityBands}
+                  onResetFilters={handleResetFilters}
+                />
+              </>
+            ) : (
+              <>
+                {/* Lead Scoring Analysis & Provisional Priority Bands */}
+                <ScoringAnalysis
+                  leads={filteredLeads}
+                  showPriorityBands={showPriorityBands}
+                  onTogglePriorityBands={() => setShowPriorityBands((p) => !p)}
+                  onQuickFilterScore={handleQuickFilterScore}
+                />
 
-            {/* 6. Detailed Lead Table */}
-            <LeadTable
-              leads={filteredLeads}
-              hasCourseColumn={mappingInfo.hasCourseColumn}
-              showPriorityBands={showPriorityBands}
-              onResetFilters={handleResetFilters}
-            />
+                {/* Executive Leadership Insights */}
+                <LeadershipInsights
+                  insights={insights}
+                  totalLeads={filteredLeads.length}
+                />
 
-            {/* 7. Methodology & Definitions Section */}
-            <MethodologySection />
+                {/* Methodology & Definitions Section */}
+                <MethodologySection />
+              </>
+            )}
           </>
         )}
       </main>
