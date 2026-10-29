@@ -100,3 +100,23 @@ export interface PriorityBandConfig {
   colorClass: string;
 }
 
+export type DrillDownType =
+  | 'KPI_IS_BOOKED'
+  | 'KPI_IS_ATTENDED'
+  | 'KPI_MAT_BOOKED'
+  | 'IS_FUNNEL'
+  | 'MAT_FUNNEL_STATUS'
+  | 'MAT_SUB_DISP'
+  | 'MAT_TS_OTHER_DISP'
+  | 'MAT_STAGE'
+  | 'SCORE'
+  | 'CATEGORY'
+  | 'STAGE';
+
+export interface DrillDownSelection {
+  type: DrillDownType;
+  value: string;
+  label: string;
+}
+
+

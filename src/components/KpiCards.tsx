@@ -4,20 +4,48 @@ import {
   CalendarCheck,
   UserCheck,
   GraduationCap,
-  Info
+  Info,
+  MousePointerClick
 } from 'lucide-react';
-import { KpiMetrics } from '../types/lead';
+import { DrillDownSelection, KpiMetrics } from '../types/lead';
 
 interface KpiCardsProps {
   metrics: KpiMetrics;
   totalDatasetCount: number;
+  drillDown: DrillDownSelection | null;
+  onToggleDrillDown: (selection: DrillDownSelection | null) => void;
 }
 
-export const KpiCards: React.FC<KpiCardsProps> = ({ metrics, totalDatasetCount }) => {
+export const KpiCards: React.FC<KpiCardsProps> = ({
+  metrics,
+  totalDatasetCount,
+  drillDown,
+  onToggleDrillDown
+}) => {
+  const isBookedSelected = drillDown?.type === 'KPI_IS_BOOKED';
+  const isAttendedSelected = drillDown?.type === 'KPI_IS_ATTENDED';
+  const matBookedSelected = drillDown?.type === 'KPI_MAT_BOOKED';
+
   return (
     <section aria-label="Primary Key Performance Indicators" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Card 1: No. of Leads */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onToggleDrillDown(null)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleDrillDown(null);
+          }
+        }}
+        title="Click to show all filtered leads in the table below"
+        className={`bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden cursor-pointer ${
+          drillDown === null
+            ? 'border-slate-200/90'
+            : 'border-slate-200/90 opacity-90 hover:opacity-100'
+        }`}
+      >
         <div className="absolute top-0 inset-x-0 h-1 bg-blue-600" />
         <div className="flex items-start justify-between">
           <div>
@@ -42,18 +70,51 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ metrics, totalDatasetCount }
         </div>
         <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
           <Info className="w-3 h-3 shrink-0" />
-          Counts matching CRM records (no name deduplication)
+          Counts matching CRM records (click to reset drill-down)
         </p>
       </div>
 
       {/* Card 2: IS Booked */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() =>
+          onToggleDrillDown({
+            type: 'KPI_IS_BOOKED',
+            value: 'IS Booked',
+            label: 'KPI: IS Booked Leads'
+          })
+        }
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleDrillDown({
+              type: 'KPI_IS_BOOKED',
+              value: 'IS Booked',
+              label: 'KPI: IS Booked Leads'
+            });
+          }
+        }}
+        title="Click to drill down table to IS Booked leads"
+        className={`bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden cursor-pointer ${
+          isBookedSelected
+            ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/10'
+            : 'border-slate-200/90'
+        }`}
+      >
         <div className="absolute top-0 inset-x-0 h-1 bg-emerald-500" />
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              IS Booked
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                IS Booked
+              </p>
+              {isBookedSelected && (
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                  Drilled Down
+                </span>
+              )}
+            </div>
             <p className="text-3xl font-bold text-navy-900 mt-2 tracking-tight">
               {metrics.isBookedCount.toLocaleString()}
             </p>
@@ -68,19 +129,55 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ metrics, totalDatasetCount }
             {metrics.isBookingRate.toFixed(1)}%
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 mt-2 truncate" title={`Funnel (Reg/RNA/ANS/Scanned): ${metrics.isBookedPrimaryCount} | Fallback (IS Booked disp.): ${metrics.isBookedFallbackCount}`}>
-          Primary Funnel: <strong className="text-slate-600">{metrics.isBookedPrimaryCount}</strong> · Sub Disp. Fallback: <strong className="text-slate-600">{metrics.isBookedFallbackCount}</strong>
+        <p className="text-[11px] text-slate-400 mt-2 truncate flex items-center justify-between gap-1" title={`Funnel (Reg/RNA/ANS/Scanned): ${metrics.isBookedPrimaryCount} | Fallback (IS Booked disp.): ${metrics.isBookedFallbackCount}`}>
+          <span>
+            Primary Funnel: <strong className="text-slate-600">{metrics.isBookedPrimaryCount}</strong> · Fallback: <strong className="text-slate-600">{metrics.isBookedFallbackCount}</strong>
+          </span>
+          <MousePointerClick className="w-3 h-3 text-slate-400 shrink-0" />
         </p>
       </div>
 
       {/* Card 3: IS Attended */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() =>
+          onToggleDrillDown({
+            type: 'KPI_IS_ATTENDED',
+            value: 'IS Attended',
+            label: 'KPI: IS Attended Leads'
+          })
+        }
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleDrillDown({
+              type: 'KPI_IS_ATTENDED',
+              value: 'IS Attended',
+              label: 'KPI: IS Attended Leads'
+            });
+          }
+        }}
+        title="Click to drill down table to IS Attended leads"
+        className={`bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden cursor-pointer ${
+          isAttendedSelected
+            ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/10'
+            : 'border-slate-200/90'
+        }`}
+      >
         <div className="absolute top-0 inset-x-0 h-1 bg-amber-500" />
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              IS Attended
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                IS Attended
+              </p>
+              {isAttendedSelected && (
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                  Drilled Down
+                </span>
+              )}
+            </div>
             <p className="text-3xl font-bold text-navy-900 mt-2 tracking-tight">
               {metrics.isAttendedCount.toLocaleString()}
             </p>
@@ -95,19 +192,55 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ metrics, totalDatasetCount }
             {metrics.isAttendanceRate.toFixed(1)}%
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 mt-2">
-          IS Attended / IS Booked · Funnel = <strong className="text-slate-600">ANS</strong> or <strong className="text-slate-600">Scanned</strong>
+        <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between gap-1">
+          <span>
+            IS Attended / IS Booked · Funnel = <strong className="text-slate-600">ANS</strong> or <strong className="text-slate-600">Scanned</strong>
+          </span>
+          <MousePointerClick className="w-3 h-3 text-slate-400 shrink-0" />
         </p>
       </div>
 
       {/* Card 4: MAT Booked */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() =>
+          onToggleDrillDown({
+            type: 'KPI_MAT_BOOKED',
+            value: 'MAT Booked',
+            label: 'KPI: MAT Booked Leads'
+          })
+        }
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleDrillDown({
+              type: 'KPI_MAT_BOOKED',
+              value: 'MAT Booked',
+              label: 'KPI: MAT Booked Leads'
+            });
+          }
+        }}
+        title="Click to drill down table to MAT Booked leads"
+        className={`bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden cursor-pointer ${
+          matBookedSelected
+            ? 'border-purple-600 ring-2 ring-purple-600/20 bg-purple-50/10'
+            : 'border-slate-200/90'
+        }`}
+      >
         <div className="absolute top-0 inset-x-0 h-1 bg-purple-600" />
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              MAT Booked
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                MAT Booked
+              </p>
+              {matBookedSelected && (
+                <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">
+                  Drilled Down
+                </span>
+              )}
+            </div>
             <p className="text-3xl font-bold text-navy-900 mt-2 tracking-tight">
               {metrics.matBookedCount.toLocaleString()}
             </p>
@@ -122,11 +255,15 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ metrics, totalDatasetCount }
             {metrics.matBookingRate.toFixed(1)}%
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 mt-2 truncate" title={`TS Funnel: ${metrics.matBookedPrimaryTsCount} | Sub Disp Only: ${metrics.matBookedSubDispCount} | Stage Fallback: ${metrics.matBookedStageFallbackCount}`}>
-          TS Funnel: <strong className="text-slate-600">{metrics.matBookedPrimaryTsCount}</strong> · Sub-Disp: <strong className="text-slate-600">{metrics.matBookedSubDispCount}</strong> · Fallback: <strong className="text-slate-600">{metrics.matBookedStageFallbackCount}</strong>
+        <p className="text-[11px] text-slate-400 mt-2 truncate flex items-center justify-between gap-1" title={`TS Funnel: ${metrics.matBookedPrimaryTsCount} | Sub Disp Only: ${metrics.matBookedSubDispCount} | Stage Fallback: ${metrics.matBookedStageFallbackCount}`}>
+          <span>
+            TS Funnel: <strong className="text-slate-600">{metrics.matBookedPrimaryTsCount}</strong> · Sub-Disp: <strong className="text-slate-600">{metrics.matBookedSubDispCount}</strong> · Fallback: <strong className="text-slate-600">{metrics.matBookedStageFallbackCount}</strong>
+          </span>
+          <MousePointerClick className="w-3 h-3 text-slate-400 shrink-0" />
         </p>
       </div>
     </section>
   );
 };
+
 

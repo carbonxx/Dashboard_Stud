@@ -1,4 +1,4 @@
-import { FilterState, ProcessedLead } from '../types/lead';
+import { DrillDownSelection, FilterState, ProcessedLead } from '../types/lead';
 import { normalizeValue } from './scoring';
 
 export const INITIAL_FILTER_STATE: FilterState = {
@@ -114,6 +114,53 @@ export function filterLeads(leads: ProcessedLead[], filters: FilterState): Proce
     }
 
     return true;
+  });
+}
+
+export function applyDrillDown(
+  leads: ProcessedLead[],
+  drillDown: DrillDownSelection | null
+): ProcessedLead[] {
+  if (!drillDown) return leads;
+
+  return leads.filter((lead) => {
+    switch (drillDown.type) {
+      case 'KPI_IS_BOOKED':
+        return lead.isBooked;
+      case 'KPI_IS_ATTENDED':
+        return lead.isAttended;
+      case 'KPI_MAT_BOOKED':
+        return lead.matBooked;
+      case 'IS_FUNNEL':
+        return (
+          normalizeValue(lead.isFunnelSpecific || lead.funnelStatus) ===
+          normalizeValue(drillDown.value)
+        );
+      case 'MAT_FUNNEL_STATUS': {
+        if (lead.matFunnelSpecific !== undefined) {
+          const key = lead.matFunnelSpecific.trim() || '(Empty)';
+          return key === drillDown.value;
+        }
+        return (lead.funnelStatus || '').trim() === drillDown.value;
+      }
+      case 'MAT_SUB_DISP':
+        return normalizeValue(lead.lastCallSubDisposition) === 'mat booked';
+      case 'MAT_TS_OTHER_DISP':
+        return (
+          normalizeValue(lead.matFunnelSpecific || lead.funnelStatus) === 'ts' &&
+          normalizeValue(lead.lastCallSubDisposition) !== 'mat booked'
+        );
+      case 'MAT_STAGE':
+        return normalizeValue(lead.leadStage) === 'mat';
+      case 'SCORE':
+        return String(lead.totalLeadScore) === drillDown.value;
+      case 'CATEGORY':
+        return (lead.leadCategory || 'Missing / Unscored') === drillDown.value;
+      case 'STAGE':
+        return (lead.leadStage || 'Missing') === drillDown.value;
+      default:
+        return true;
+    }
   });
 }
 

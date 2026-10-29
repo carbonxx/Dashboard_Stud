@@ -12,13 +12,23 @@ import {
   Pie,
   Legend
 } from 'recharts';
-import { BarChart2, PieChart as PieChartIcon, Layers, Award, TrendingUp } from 'lucide-react';
-import { ProcessedLead } from '../types/lead';
+import {
+  BarChart2,
+  PieChart as PieChartIcon,
+  Layers,
+  Award,
+  TrendingUp,
+  MousePointerClick,
+  X
+} from 'lucide-react';
+import { DrillDownSelection, ProcessedLead } from '../types/lead';
 import { normalizeValue } from '../utils/scoring';
 
 interface ChartsSectionProps {
   leads: ProcessedLead[];
   showPriorityBands: boolean;
+  drillDown: DrillDownSelection | null;
+  onToggleDrillDown: (selection: DrillDownSelection | null) => void;
 }
 
 const IS_FUNNEL_KEYS = [
@@ -43,7 +53,12 @@ const STAGE_COLORS: Record<string, string> = {
   NI: '#64748b'
 };
 
-export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorityBands }) => {
+export const ChartsSection: React.FC<ChartsSectionProps> = ({
+  leads,
+  showPriorityBands,
+  drillDown,
+  onToggleDrillDown
+}) => {
   const totalLeads = leads.length;
 
   // 1. IS Funnel Breakdown (NRIS, Registered, RNA, ANS, Scanned)
@@ -68,7 +83,12 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
       fullDesc: item.fullDesc,
       count: counts[item.key],
       pct: totalLeads > 0 ? Number(((counts[item.key] / totalLeads) * 100).toFixed(1)) : 0,
-      color: item.color
+      color: item.color,
+      drillDown: {
+        type: 'IS_FUNNEL' as const,
+        value: item.label,
+        label: `IS Funnel: ${item.label}`
+      }
     }));
   }, [leads, totalLeads]);
 
@@ -82,12 +102,10 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
       const norm = normalizeValue(rawStatus);
 
       if (l.matFunnelSpecific) {
-        // Explicit MAT Funnel column present
         const key = rawStatus || '(Empty)';
         const prev = statusMap.get(key) ?? { count: 0, isMatStatus: true };
         statusMap.set(key, { count: prev.count + 1, isMatStatus: true });
       } else {
-        // Combined IS / MAT Funnel column: distinguish MAT funnel statuses (e.g. TS) from IS funnel statuses
         if (rawStatus && !isKnownStatuses.has(norm)) {
           const prev = statusMap.get(rawStatus) ?? { count: 0, isMatStatus: true };
           statusMap.set(rawStatus, { count: prev.count + 1, isMatStatus: true });
@@ -95,13 +113,13 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
       }
     }
 
-    // Also include breakdown of MAT Booked vs Non-MAT Funnel leads for clear visual context
     const results: Array<{
       name: string;
       description: string;
       count: number;
       pct: number;
       color: string;
+      drillDown: DrillDownSelection;
     }> = [];
 
     for (const [status, info] of statusMap.entries()) {
@@ -113,11 +131,15 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
             : `MAT Funnel Status: ${status}`,
         count: info.count,
         pct: totalLeads > 0 ? Number(((info.count / totalLeads) * 100).toFixed(1)) : 0,
-        color: '#7c3aed'
+        color: '#7c3aed',
+        drillDown: {
+          type: 'MAT_FUNNEL_STATUS',
+          value: status,
+          label: `MAT Funnel Status: ${status}`
+        }
       });
     }
 
-    // Add Sub-Disposition 'MAT Booked' count & Stage = MAT count for complete MAT funnel visibility
     const matSubDispCount = leads.filter(
       (l) => normalizeValue(l.lastCallSubDisposition) === 'mat booked'
     ).length;
@@ -134,7 +156,12 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
         description: 'Last Call Sub Disposition = MAT Booked',
         count: matSubDispCount,
         pct: totalLeads > 0 ? Number(((matSubDispCount / totalLeads) * 100).toFixed(1)) : 0,
-        color: '#6366f1'
+        color: '#6366f1',
+        drillDown: {
+          type: 'MAT_SUB_DISP',
+          value: 'MAT Booked (Call Disp.)',
+          label: 'MAT Funnel: Call Disposition = MAT Booked'
+        }
       });
       if (tsWithDnpCount > 0) {
         results.push({
@@ -142,7 +169,12 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
           description: 'MAT Funnel = TS with non-MAT Booked Call Disposition (e.g. DNP)',
           count: tsWithDnpCount,
           pct: totalLeads > 0 ? Number(((tsWithDnpCount / totalLeads) * 100).toFixed(1)) : 0,
-          color: '#a855f7'
+          color: '#a855f7',
+          drillDown: {
+            type: 'MAT_TS_OTHER_DISP',
+            value: 'TS + Other Disp.',
+            label: 'MAT Funnel: TS + Non-MAT Booked Call Disposition'
+          }
         });
       }
       results.push({
@@ -150,7 +182,12 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
         description: 'Lead Stage = MAT',
         count: matStageCount,
         pct: totalLeads > 0 ? Number(((matStageCount / totalLeads) * 100).toFixed(1)) : 0,
-        color: '#0d9488'
+        color: '#0d9488',
+        drillDown: {
+          type: 'MAT_STAGE',
+          value: 'Active MAT Stage',
+          label: 'MAT Funnel: Active MAT Lead Stage'
+        }
       });
     }
 
@@ -179,7 +216,12 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
         name,
         count,
         pct: totalLeads > 0 ? Number(((count / totalLeads) * 100).toFixed(1)) : 0,
-        color: CATEGORY_COLORS[name] || '#64748b'
+        color: CATEGORY_COLORS[name] || '#64748b',
+        drillDown: {
+          type: 'CATEGORY' as const,
+          value: name,
+          label: `Lead Category: ${name}`
+        }
       }));
   }, [leads, totalLeads]);
 
@@ -203,14 +245,27 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
 
     return scoreDefs
       .map((d) => ({
+        scoreKey: d.scoreKey,
         name: d.label,
         band: showPriorityBands ? d.band : d.label,
-        displayLabel: showPriorityBands && d.scoreKey !== 'Unscored' ? `${d.label} (${d.band.replace(' Priority', '')})` : d.label,
+        displayLabel:
+          showPriorityBands && d.scoreKey !== 'Unscored'
+            ? `${d.label} (${d.band.replace(' Priority', '')})`
+            : d.label,
         count: counts[d.scoreKey] ?? 0,
         pct: totalLeads > 0 ? Number((((counts[d.scoreKey] ?? 0) / totalLeads) * 100).toFixed(1)) : 0,
-        color: d.color
+        color: d.color,
+        drillDown: {
+          type: 'SCORE' as const,
+          value: d.scoreKey,
+          label: `Total Lead Score: ${d.label}`
+        }
       }))
-      .filter((item) => item.count > 0 || ['Score 5', 'Score 4', 'Score 3', 'Score 2', 'Score 1'].includes(item.name));
+      .filter(
+        (item) =>
+          item.count > 0 ||
+          ['Score 5', 'Score 4', 'Score 3', 'Score 2', 'Score 1'].includes(item.name)
+      );
   }, [leads, totalLeads, showPriorityBands]);
 
   // 5. Lead Stage Distribution
@@ -231,14 +286,25 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
         if (idxB !== -1) return 1;
         return b[1] - a[1];
       })
-      .map(([name, count]) => ({
-        name: name === 'v' ? `"v" (Unscored Anomaly)` : name,
-        rawName: name,
-        count,
-        pct: totalLeads > 0 ? Number(((count / totalLeads) * 100).toFixed(1)) : 0,
-        color: STAGE_COLORS[name] || '#ef4444'
-      }));
+      .map(([name, count]) => {
+        const displayName = name === 'v' ? `"v" (Unscored Anomaly)` : name;
+        return {
+          name: displayName,
+          rawName: name,
+          count,
+          pct: totalLeads > 0 ? Number(((count / totalLeads) * 100).toFixed(1)) : 0,
+          color: STAGE_COLORS[name] || '#ef4444',
+          drillDown: {
+            type: 'STAGE' as const,
+            value: name,
+            label: `Lead Stage: ${displayName}`
+          }
+        };
+      });
   }, [leads, totalLeads]);
+
+  const isMatchedDrillDown = (candidate: DrillDownSelection) =>
+    drillDown?.type === candidate.type && drillDown?.value === candidate.value;
 
   if (totalLeads === 0) {
     return (
@@ -252,6 +318,31 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
 
   return (
     <section aria-label="Funnel and Lead Quality Visualizations" className="space-y-4">
+      {/* Interactive Drill-Down Hint / Active Banner */}
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-2.5 shadow-sm flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <MousePointerClick className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>
+            <strong className="text-navy-900">Interactive Drill-Down:</strong> Click any bar, pie slice, KPI card, or summary box below to filter the Lead Explorer table at the bottom.
+          </span>
+        </div>
+        {drillDown && (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+              Drilled Down: <strong>{drillDown.label}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => onToggleDrillDown(null)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear Drill-Down
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Chart 1: IS Funnel Breakdown */}
         <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm flex flex-col">
@@ -262,7 +353,7 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                 <h3 className="text-sm font-bold text-navy-900">IS Funnel Breakdown</h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Info Session progression across NRIS, Registered, RNA, ANS, and Scanned statuses
+                Click any status bar or box below to drill down the lead table
               </p>
             </div>
             <span className="text-[11px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
@@ -297,27 +388,60 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                         <p className="font-semibold text-blue-300">
                           Count: {item.count} ({item.pct}% of filtered leads)
                         </p>
+                        <p className="text-[10px] text-slate-400 mt-1">Click to drill down table</p>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={52}>
-                  {isFunnelData.map((entry, index) => (
-                    <Cell key={`cell-is-${index}`} fill={entry.color} />
-                  ))}
+                <Bar
+                  dataKey="count"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={52}
+                  cursor="pointer"
+                  onClick={(data) => {
+                    if (data && data.drillDown) {
+                      onToggleDrillDown(data.drillDown);
+                    }
+                  }}
+                >
+                  {isFunnelData.map((entry, index) => {
+                    const selected = isMatchedDrillDown(entry.drillDown);
+                    const hasOtherSelection = drillDown?.type === 'IS_FUNNEL' && !selected;
+                    return (
+                      <Cell
+                        key={`cell-is-${index}`}
+                        fill={entry.color}
+                        fillOpacity={hasOtherSelection ? 0.35 : 1}
+                        stroke={selected ? '#0f172a' : 'none'}
+                        strokeWidth={selected ? 2 : 0}
+                      />
+                    );
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-5 gap-1.5 text-center">
-            {isFunnelData.map((d) => (
-              <div key={d.name} className="bg-slate-50 rounded-lg p-1.5 border border-slate-100">
-                <p className="text-[11px] font-semibold text-slate-600">{d.name}</p>
-                <p className="text-xs font-bold text-navy-900">{d.count}</p>
-                <p className="text-[10px] text-slate-400">{d.pct}%</p>
-              </div>
-            ))}
+            {isFunnelData.map((d) => {
+              const selected = isMatchedDrillDown(d.drillDown);
+              return (
+                <button
+                  key={d.name}
+                  type="button"
+                  onClick={() => onToggleDrillDown(d.drillDown)}
+                  className={`rounded-lg p-1.5 border transition-all cursor-pointer text-center ${
+                    selected
+                      ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                >
+                  <p className="text-[11px] font-semibold text-slate-600">{d.name}</p>
+                  <p className="text-xs font-bold text-navy-900">{d.count}</p>
+                  <p className="text-[10px] text-slate-400">{d.pct}%</p>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -330,7 +454,7 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                 <h3 className="text-sm font-bold text-navy-900">MAT Funnel Breakdown</h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Available MAT Funnel statuses (including TS) and related MAT call/stage signals
+                Click any MAT signal bar or box below to drill down the lead table
               </p>
             </div>
             <span className="text-[11px] font-semibold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md border border-purple-200">
@@ -371,28 +495,68 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                             <p className="font-semibold text-purple-300">
                               Count: {item.count} ({item.pct}% of filtered leads)
                             </p>
+                            <p className="text-[10px] text-slate-400 mt-1">Click to drill down table</p>
                           </div>
                         );
                       }}
                     />
-                    <Bar dataKey="count" radius={[0, 6, 6, 0]} maxBarSize={36}>
-                      {matFunnelData.map((entry, idx) => (
-                        <Cell key={`mat-cell-${idx}`} fill={entry.color} />
-                      ))}
+                    <Bar
+                      dataKey="count"
+                      radius={[0, 6, 6, 0]}
+                      maxBarSize={36}
+                      cursor="pointer"
+                      onClick={(data) => {
+                        if (data && data.drillDown) {
+                          onToggleDrillDown(data.drillDown);
+                        }
+                      }}
+                    >
+                      {matFunnelData.map((entry, idx) => {
+                        const selected = isMatchedDrillDown(entry.drillDown);
+                        const isMatChartSelected =
+                          drillDown &&
+                          [
+                            'MAT_FUNNEL_STATUS',
+                            'MAT_SUB_DISP',
+                            'MAT_TS_OTHER_DISP',
+                            'MAT_STAGE'
+                          ].includes(drillDown.type);
+                        return (
+                          <Cell
+                            key={`mat-cell-${idx}`}
+                            fill={entry.color}
+                            fillOpacity={isMatChartSelected && !selected ? 0.35 : 1}
+                            stroke={selected ? '#0f172a' : 'none'}
+                            strokeWidth={selected ? 2 : 0}
+                          />
+                        );
+                      })}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
               <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                {matFunnelData.map((d) => (
-                  <div key={d.name} className="bg-slate-50 rounded-lg p-1.5 border border-slate-100">
-                    <p className="text-[11px] font-semibold text-slate-600 truncate" title={d.name}>
-                      {d.name}
-                    </p>
-                    <p className="text-xs font-bold text-navy-900">{d.count}</p>
-                    <p className="text-[10px] text-slate-400">{d.pct}% of total</p>
-                  </div>
-                ))}
+                {matFunnelData.map((d) => {
+                  const selected = isMatchedDrillDown(d.drillDown);
+                  return (
+                    <button
+                      key={d.name}
+                      type="button"
+                      onClick={() => onToggleDrillDown(d.drillDown)}
+                      className={`rounded-lg p-1.5 border transition-all cursor-pointer text-center ${
+                        selected
+                          ? 'bg-purple-50 border-purple-500 ring-2 ring-purple-500/20'
+                          : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <p className="text-[11px] font-semibold text-slate-600 truncate" title={d.name}>
+                        {d.name}
+                      </p>
+                      <p className="text-xs font-bold text-navy-900">{d.count}</p>
+                      <p className="text-[10px] text-slate-400">{d.pct}% of total</p>
+                    </button>
+                  );
+                })}
               </div>
             </>
           ) : (
@@ -410,10 +574,10 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
           <div className="mb-3">
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 text-purple-600" />
-              <h3 className="text-sm font-bold text-navy-900">Lead Score & Priority Distribution</h3>
+              <h3 className="text-sm font-bold text-navy-900">Lead Score &amp; Priority Distribution</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Total Lead Score = Stage Score + Category Score (Unscored shown separately)
+              Click any score bar or badge to filter the lead table
             </p>
           </div>
 
@@ -445,30 +609,60 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                         <p className="font-semibold text-emerald-300">
                           {item.count} leads ({item.pct}%)
                         </p>
+                        <p className="text-[10px] text-slate-400 mt-1">Click to drill down table</p>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={42}>
-                  {scoreData.map((entry, idx) => (
-                    <Cell key={`score-cell-${idx}`} fill={entry.color} />
-                  ))}
+                <Bar
+                  dataKey="count"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={42}
+                  cursor="pointer"
+                  onClick={(data) => {
+                    if (data && data.drillDown) {
+                      onToggleDrillDown(data.drillDown);
+                    }
+                  }}
+                >
+                  {scoreData.map((entry, idx) => {
+                    const selected = isMatchedDrillDown(entry.drillDown);
+                    const hasOtherSelection = drillDown?.type === 'SCORE' && !selected;
+                    return (
+                      <Cell
+                        key={`score-cell-${idx}`}
+                        fill={entry.color}
+                        fillOpacity={hasOtherSelection ? 0.35 : 1}
+                        stroke={selected ? '#0f172a' : 'none'}
+                        strokeWidth={selected ? 2 : 0}
+                      />
+                    );
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5">
-            {scoreData.map((s) => (
-              <span
-                key={s.name}
-                className="inline-flex items-center gap-1 text-[11px] bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md"
-              >
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                <span className="font-medium text-slate-700">{s.name}:</span>
-                <strong className="text-navy-900">{s.count}</strong>
-              </span>
-            ))}
+            {scoreData.map((s) => {
+              const selected = isMatchedDrillDown(s.drillDown);
+              return (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => onToggleDrillDown(s.drillDown)}
+                  className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                    selected
+                      ? 'bg-purple-50 border-purple-500 ring-2 ring-purple-500/20'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="font-medium text-slate-700">{s.name}:</span>
+                  <strong className="text-navy-900">{s.count}</strong>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -480,7 +674,7 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
               <h3 className="text-sm font-bold text-navy-900">Lead Category Distribution</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Breakdown by CRM Lead Category (High = 3, Upper Medium = 2, Medium = 1)
+              Click any slice or category box to drill down the lead table
             </p>
           </div>
 
@@ -496,10 +690,26 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                   innerRadius={48}
                   outerRadius={78}
                   paddingAngle={3}
+                  cursor="pointer"
+                  onClick={(data) => {
+                    if (data && data.drillDown) {
+                      onToggleDrillDown(data.drillDown);
+                    }
+                  }}
                 >
-                  {categoryData.map((entry, idx) => (
-                    <Cell key={`cat-cell-${idx}`} fill={entry.color} />
-                  ))}
+                  {categoryData.map((entry, idx) => {
+                    const selected = isMatchedDrillDown(entry.drillDown);
+                    const hasOtherSelection = drillDown?.type === 'CATEGORY' && !selected;
+                    return (
+                      <Cell
+                        key={`cat-cell-${idx}`}
+                        fill={entry.color}
+                        fillOpacity={hasOtherSelection ? 0.35 : 1}
+                        stroke={selected ? '#0f172a' : '#ffffff'}
+                        strokeWidth={selected ? 2.5 : 1}
+                      />
+                    );
+                  })}
                 </Pie>
                 <Tooltip
                   content={({ active, payload }) => {
@@ -511,6 +721,7 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                         <p className="text-blue-300">
                           {item.count} leads ({item.pct}%)
                         </p>
+                        <p className="text-[10px] text-slate-400 mt-1">Click to drill down table</p>
                       </div>
                     );
                   }}
@@ -525,14 +736,26 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
           </div>
 
           <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2 text-center">
-            {categoryData.map((c) => (
-              <div key={c.name} className="bg-slate-50 rounded-lg p-1.5 border border-slate-100">
-                <p className="text-[11px] font-semibold text-slate-600 truncate">{c.name}</p>
-                <p className="text-xs font-bold text-navy-900">
-                  {c.count} <span className="text-[10px] font-normal text-slate-500">({c.pct}%)</span>
-                </p>
-              </div>
-            ))}
+            {categoryData.map((c) => {
+              const selected = isMatchedDrillDown(c.drillDown);
+              return (
+                <button
+                  key={c.name}
+                  type="button"
+                  onClick={() => onToggleDrillDown(c.drillDown)}
+                  className={`rounded-lg p-1.5 border transition-all cursor-pointer text-center ${
+                    selected
+                      ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                >
+                  <p className="text-[11px] font-semibold text-slate-600 truncate">{c.name}</p>
+                  <p className="text-xs font-bold text-navy-900">
+                    {c.count} <span className="text-[10px] font-normal text-slate-500">({c.pct}%)</span>
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -544,7 +767,7 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
               <h3 className="text-sm font-bold text-navy-900">Lead Stage Distribution</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Distribution of IS, MAT, Not Interested, and any anomalous stage values
+              Click any stage bar or box below to drill down the lead table
             </p>
           </div>
 
@@ -573,37 +796,66 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({ leads, showPriorit
                         <p className="text-emerald-300">
                           {item.count} leads ({item.pct}%)
                         </p>
+                        <p className="text-[10px] text-slate-400 mt-1">Click to drill down table</p>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                  {stageData.map((entry, idx) => (
-                    <Cell key={`stage-cell-${idx}`} fill={entry.color} />
-                  ))}
+                <Bar
+                  dataKey="count"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={48}
+                  cursor="pointer"
+                  onClick={(data) => {
+                    if (data && data.drillDown) {
+                      onToggleDrillDown(data.drillDown);
+                    }
+                  }}
+                >
+                  {stageData.map((entry, idx) => {
+                    const selected = isMatchedDrillDown(entry.drillDown);
+                    const hasOtherSelection = drillDown?.type === 'STAGE' && !selected;
+                    return (
+                      <Cell
+                        key={`stage-cell-${idx}`}
+                        fill={entry.color}
+                        fillOpacity={hasOtherSelection ? 0.35 : 1}
+                        stroke={selected ? '#0f172a' : 'none'}
+                        strokeWidth={selected ? 2 : 0}
+                      />
+                    );
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-            {stageData.map((st) => (
-              <div
-                key={st.rawName}
-                className="flex-1 min-w-[70px] bg-slate-50 rounded-lg p-1.5 border border-slate-100 text-center"
-              >
-                <p className="text-[11px] font-semibold text-slate-600 truncate" title={st.name}>
-                  {st.rawName}
-                </p>
-                <p className="text-xs font-bold text-navy-900">
-                  {st.count} <span className="text-[10px] font-normal text-slate-500">({st.pct}%)</span>
-                </p>
-              </div>
-            ))}
+            {stageData.map((st) => {
+              const selected = isMatchedDrillDown(st.drillDown);
+              return (
+                <button
+                  key={st.rawName}
+                  type="button"
+                  onClick={() => onToggleDrillDown(st.drillDown)}
+                  className={`flex-1 min-w-[70px] rounded-lg p-1.5 border transition-all cursor-pointer text-center ${
+                    selected
+                      ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20'
+                      : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                >
+                  <p className="text-[11px] font-semibold text-slate-600 truncate" title={st.name}>
+                    {st.rawName}
+                  </p>
+                  <p className="text-xs font-bold text-navy-900">
+                    {st.count} <span className="text-[10px] font-normal text-slate-500">({st.pct}%)</span>
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
     </section>
   );
 };
-

@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ColumnMappingInfo, FilterState, ProcessedLead } from './types/lead';
+import {
+  ColumnMappingInfo,
+  DrillDownSelection,
+  FilterState,
+  ProcessedLead
+} from './types/lead';
 import { parseDelimitedText, processLeadRows } from './utils/csvParser';
 import { calculateKpiMetrics } from './utils/kpi';
 import {
+  applyDrillDown,
   filterLeads,
   generateLeadershipInsights,
   INITIAL_FILTER_STATE
@@ -36,6 +42,7 @@ export function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTER_STATE);
+  const [drillDown, setDrillDown] = useState<DrillDownSelection | null>(null);
   const [showPriorityBands, setShowPriorityBands] = useState<boolean>(true);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
@@ -66,6 +73,7 @@ export function App() {
       setDatasetName(sourceName);
       setIsUsingReferenceData(isRef);
       setFilters(INITIAL_FILTER_STATE);
+      setDrillDown(null);
       setLoadError(null);
 
       return {
@@ -117,7 +125,20 @@ export function App() {
 
   const handleResetFilters = () => {
     setFilters(INITIAL_FILTER_STATE);
+    setDrillDown(null);
   };
+
+  const handleToggleDrillDown = useCallback((selection: DrillDownSelection | null) => {
+    if (!selection) {
+      setDrillDown(null);
+      return;
+    }
+    setDrillDown((prev) =>
+      prev && prev.type === selection.type && prev.value === selection.value
+        ? null
+        : selection
+    );
+  }, []);
 
   const handleQuickFilterScore = (scoreStr: string) => {
     setFilters((prev) => ({
@@ -129,6 +150,10 @@ export function App() {
   const filteredLeads = useMemo(() => {
     return filterLeads(leads, filters);
   }, [leads, filters]);
+
+  const drilledDownLeads = useMemo(() => {
+    return applyDrillDown(filteredLeads, drillDown);
+  }, [filteredLeads, drillDown]);
 
   const kpiMetrics = useMemo(() => {
     return calculateKpiMetrics(filteredLeads);
@@ -231,20 +256,29 @@ export function App() {
                 />
 
                 {/* 2. Four Primary KPIs */}
-                <KpiCards metrics={kpiMetrics} totalDatasetCount={leads.length} />
+                <KpiCards
+                  metrics={kpiMetrics}
+                  totalDatasetCount={leads.length}
+                  drillDown={drillDown}
+                  onToggleDrillDown={handleToggleDrillDown}
+                />
 
                 {/* 3. Visualizations */}
                 <ChartsSection
                   leads={filteredLeads}
                   showPriorityBands={showPriorityBands}
+                  drillDown={drillDown}
+                  onToggleDrillDown={handleToggleDrillDown}
                 />
 
                 {/* 4. Detailed Lead Table */}
                 <LeadTable
-                  leads={filteredLeads}
+                  leads={drilledDownLeads}
                   hasCourseColumn={mappingInfo.hasCourseColumn}
                   showPriorityBands={showPriorityBands}
                   onResetFilters={handleResetFilters}
+                  drillDown={drillDown}
+                  onClearDrillDown={() => setDrillDown(null)}
                 />
               </>
             ) : (

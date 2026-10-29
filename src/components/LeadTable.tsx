@@ -10,15 +10,19 @@ import {
   ChevronRight,
   AlertTriangle,
   SearchX,
-  Info
+  Info,
+  Filter,
+  X
 } from 'lucide-react';
-import { ProcessedLead } from '../types/lead';
+import { DrillDownSelection, ProcessedLead } from '../types/lead';
 
 interface LeadTableProps {
   leads: ProcessedLead[];
   hasCourseColumn: boolean;
   showPriorityBands: boolean;
   onResetFilters: () => void;
+  drillDown?: DrillDownSelection | null;
+  onClearDrillDown?: () => void;
 }
 
 type SortField =
@@ -77,7 +81,9 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   leads,
   hasCourseColumn,
   showPriorityBands,
-  onResetFilters
+  onResetFilters,
+  drillDown,
+  onClearDrillDown
 }) => {
   const [sortField, setSortField] = useState<SortField>('totalLeadScore');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
@@ -105,7 +111,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   // Reset to page 1 when filtered leads change
   React.useEffect(() => {
     setPage(1);
-  }, [leads.length]);
+  }, [leads.length, drillDown?.type, drillDown?.value]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -248,6 +254,28 @@ export const LeadTable: React.FC<LeadTableProps> = ({
       aria-label="Detailed CRM Lead Records Table"
       className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden"
     >
+      {/* Active Visual Drill-Down Banner */}
+      {drillDown && (
+        <div className="bg-blue-50/90 border-b border-blue-200 px-4 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-blue-900">
+            <Filter className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>
+              Visual Drill-Down Active: <strong className="font-bold">{drillDown.label}</strong> ({leads.length} matching records)
+            </span>
+          </div>
+          {onClearDrillDown && (
+            <button
+              type="button"
+              onClick={onClearDrillDown}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              Show All Filtered Leads
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Table Header Bar */}
       <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
